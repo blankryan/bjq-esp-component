@@ -12,7 +12,7 @@
 - [ ] Layer dependency direction is respected (`features` -> `platform` -> `drivers` -> `utilities`)
 - [ ] Code formatted with `.clang-format` (ESP-IDF 4-space K&R style)
 - [ ] Public headers have complete Doxygen documentation
-- [ ] Component `README.md`, `docs/*.md`, and `CHANGELOG.md` (`[Unreleased]`) are updated
+- [ ] Component `README.md`, `docs/*.md` (including `docs/bench-testing.md` for release PRs), and `CHANGELOG.md` (`[Unreleased]`) are updated
 - [ ] `python tools/validate_components.py` passes locally
 - [ ] `examples/` and `test_apps/` build cleanly under ESP-IDF v6.1
 
@@ -20,4 +20,5 @@
 
 - **ESP-IDF Version:** `6.1.0`
 - **Targets built locally:** (e.g., `esp32`, `esp32s3`, `esp32c3`, `esp32c6`)
-- **Hardware verification (if applicable):** (e.g., board/PCB revision or "Build-only")
+- **Bench-test decision (for releases):** Confirmed with engineer — `Ran (Real HW / Wokwi / Both)` or `Skipped (reason: ...)`
+- **Per-chip bench-test summary:** (e.g., `esp32s3: Real HW PASS (DevKitC + MFRC522); esp32: Wokwi PASS; esp32c3/esp32c6: Build-only (boards unavailable)`)

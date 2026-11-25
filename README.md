@@ -125,7 +125,8 @@ Run `idf.py reconfigure` (or `idf.py build`) and commit the resulting `dependenc
 │   ├── architecture.md
 │   ├── configuration.md
 │   ├── concurrency-and-resources.md
-│   └── troubleshooting.md
+│   ├── troubleshooting.md
+│   └── bench-testing.md
 ├── examples/
 │   └── basic/
 └── test_apps/
@@ -166,6 +167,12 @@ python tools/new_component.py --layer drivers --name bjq_ads111x --description "
 
 ```bash
 python tools/validate_components.py
+```
+
+### Run a pre-release hardware / Wokwi bench-test
+
+```bash
+python tools/bench_test.py --component drivers/bjq_mfrc522
 ```
 
 ### Build an example or test app with ESP-IDF v6.1

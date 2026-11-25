@@ -26,6 +26,7 @@ DOC_PAGES = [
     ("docs/configuration.md", "configuration.md", "Configuration"),
     ("docs/concurrency-and-resources.md", "concurrency-and-resources.md", "Concurrency & Resources"),
     ("docs/troubleshooting.md", "troubleshooting.md", "Troubleshooting"),
+    ("docs/bench-testing.md", "bench-testing.md", "Bench Testing"),
     ("CHANGELOG.md", "changelog.md", "Changelog"),
 ]
 
@@ -36,6 +37,7 @@ def rewrite_readme_links(text: str) -> str:
         "(docs/configuration.md)": "(configuration.md)",
         "(docs/concurrency-and-resources.md)": "(concurrency-and-resources.md)",
         "(docs/troubleshooting.md)": "(troubleshooting.md)",
+        "(docs/bench-testing.md)": "(bench-testing.md)",
         "(CHANGELOG.md)": "(changelog.md)",
         "(LICENSE)": f"({REPO_LICENSE_URL})",
     }

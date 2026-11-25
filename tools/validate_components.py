@@ -38,6 +38,7 @@ REQUIRED_DOCS = (
     "docs/configuration.md",
     "docs/concurrency-and-resources.md",
     "docs/troubleshooting.md",
+    "docs/bench-testing.md",
 )
 
 
@@ -115,6 +116,24 @@ def validate_app_manifest(
             f"{prefix}: override_path '{comp_dep['override_path']}' in {manifest_path.relative_to(component_dir)} "
             f"resolves to {resolved}, expected {component_dir.resolve()}"
         )
+
+    # Optional Wokwi configuration sanity checks (only enforced when present)
+    wokwi_toml = app_dir / "wokwi.toml"
+    diagram_json = app_dir / "diagram.json"
+    if wokwi_toml.is_file():
+        toml_text = wokwi_toml.read_text(encoding="utf-8", errors="replace")
+        for key in ("[wokwi]", "firmware", "elf"):
+            if key not in toml_text:
+                errors.append(f"{prefix}: wokwi.toml missing required field '{key}'")
+        if not diagram_json.is_file():
+            errors.append(f"{prefix}: wokwi.toml present without companion diagram.json")
+    if diagram_json.is_file():
+        try:
+            diagram_data = json.loads(diagram_json.read_text(encoding="utf-8"))
+            if not isinstance(diagram_data, dict) or not isinstance(diagram_data.get("parts"), list):
+                errors.append(f"{prefix}: diagram.json must be a JSON object with a 'parts' list")
+        except json.JSONDecodeError as exc:
+            errors.append(f"{prefix}: invalid JSON in diagram.json: {exc}")
 
 
 def validate_component(
@@ -321,6 +340,14 @@ def validate_component(
             errors.append(f"{rel_path}: docs/troubleshooting.md missing Error Handling section")
         if not has_heading_keywords(text, ("limitation",)):
             errors.append(f"{rel_path}: docs/troubleshooting.md missing Known Limitations section")
+
+    bench_doc = component_dir / "docs/bench-testing.md"
+    if bench_doc.is_file():
+        text = bench_doc.read_text(encoding="utf-8", errors="replace")
+        if not has_heading_keywords(text, ("matrix", "verification")):
+            errors.append(f"{rel_path}: docs/bench-testing.md missing Verification Matrix section")
+        if not has_heading_keywords(text, ("session", "evidence", "serial", "bench-test")):
+            errors.append(f"{rel_path}: docs/bench-testing.md missing Bench-Test Sessions / Evidence section")
 
     # Examples check
     examples_dir = component_dir / "examples"

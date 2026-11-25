@@ -84,32 +84,57 @@ Optional flags:
 
 ---
 
-## 5. Manual GitHub Release Checklist
+## 5. Pre-Release Hardware & Wokwi Bench-Testing
+
+Before preparing a release PR, always confirm bench-testing with the engineer:
+
+1. **Ask first whether to bench-test or skip:** Bench-testing is not required for every release (e.g., docs-only or metadata patches), but skipping must be explicitly approved and recorded with a reason in `<layer>/bjq_<name>/docs/bench-testing.md`.
+2. **Choose per-chip environment (`Real HW`, `Wokwi`, `Both`, or `Build-only / Unavailable`):** Because not every target chip (`esp32`, `esp32s3`, `esp32c3`, `esp32c6`) is always available on the bench simultaneously, explicitly select what is available and record the status for every declared chip.
+3. **Explicit COM port confirmation:** When running on real hardware, `tools/bench_test.py` displays detected serial ports for reference only and always requires explicit COM port selection and confirmation from the engineer before flashing or monitoring.
+4. **Capture and curate important serial evidence:**
+   - Run the interactive helper:
+     ```bash
+     python tools/bench_test.py --component <layer>/bjq_<name>
+     ```
+   - Or extract curated evidence from an existing log file (from `idf.py monitor` or VS Code Wokwi):
+     ```bash
+     python tools/bench_test.py --extract-log bench_logs/<component>/<session>.log
+     ```
+   - Raw full logs stay local in gitignored `bench_logs/`. Commit only curated, redacted serial excerpts (boot/HW ID, functional/Unity results, errors/warnings/panics, measured size/memory, and engineer notes) into `<layer>/bjq_<name>/docs/bench-testing.md`, and upgrade estimates to measured values in `docs/concurrency-and-resources.md` when real measurements are captured.
+
+---
+
+## 6. Manual GitHub Release Checklist
 
 Releases are per-component and published manually on GitHub after validation on `main`.
 
 1. **Check dependency order (bottom-up):**
    - If this release requires newly added APIs in a lower-layer component (e.g., `utilities/bjq_time_utils`), release and tag that lower-layer component first, then update this component's `idf_component.yml` to pin the new tag.
-2. **Prepare a release PR to `main`:**
+2. **Run or explicitly record bench-test decision (Section 5):**
+   - Confirm with the engineer whether to bench-test on Real Hardware, Wokwi, Both, or skip (with reason), and update `<layer>/bjq_<name>/docs/bench-testing.md` (plus `docs/concurrency-and-resources.md` / `docs/troubleshooting.md` for measured numbers and hardware quirks).
+3. **Prepare a release PR to `main`:**
    - Bump `version:` in `<layer>/bjq_<name>/idf_component.yml` using Semantic Versioning (`MAJOR.MINOR.PATCH`).
    - Move items from `## [Unreleased]` into `## [X.Y.Z] - YYYY-MM-DD` in `<layer>/bjq_<name>/CHANGELOG.md` (include migration notes for breaking changes).
-   - Update integration snippets in `<layer>/bjq_<name>/README.md` if the recommended tag or API changed.
+   - Update integration snippets and testing status in `<layer>/bjq_<name>/README.md`.
    - Verify documentation distinguishes current behavior, design intent, and known limitations.
-3. **Merge and confirm green CI on `main`:**
-   - Wait for `.github/workflows/ci.yml` and `.github/workflows/docs.yml` to succeed on the merged `main` commit.
-4. **Create the Git tag and GitHub Release manually:**
+4. **Merge and confirm green CI on `main`:**
+   - Wait for `.github/workflows/ci.yml` (`CI Gate`) and `.github/workflows/docs.yml` to succeed on the merged `main` commit.
+5. **Create the Git tag and GitHub Release manually:**
    - Open GitHub -> **Releases** -> **Draft a new release**.
    - Tag: `bjq_<name>/vX.Y.Z` targeting the validated `main` commit.
    - Title: `bjq_<name> vX.Y.Z`.
-   - Body: paste the `CHANGELOG.md` entry plus traceability metadata:
+   - Body: paste the `CHANGELOG.md` entry plus traceability metadata (generated automatically by `tools/bench_test.py`):
      ```markdown
      ### Release Traceability
      - **Component:** `bjq_<name>` (`<layer>/bjq_<name>`)
      - **Version:** `X.Y.Z`
      - **Source Commit:** `<commit-sha>`
      - **ESP-IDF Version:** `6.1.0` (`>=6.1.0,<7.0.0`)
-     - **CI-Validated Targets:** `esp32`, `esp32s3`, `esp32c3`, `esp32c6`
-     - **Hardware / Test Notes:** <note tested devkit/PCB revision or build-only status>
+     - **Bench-Test Summary:**
+       - `esp32`: Real HW — **PASS** (<board/notes>)
+       - `esp32s3`: Wokwi — **PASS** (<notes>)
+       - `esp32c3`: Build-only (CI) — **BUILD-ONLY** (board unavailable)
+       - `esp32c6`: Build-only (CI) — **BUILD-ONLY** (board unavailable)
      ```
-5. **Adopt in consuming products:**
+6. **Adopt in consuming products:**
    - Update `version: "bjq_<name>/vX.Y.Z"` in the product's `idf_component.yml`, run `idf.py reconfigure`, verify build/tests, and commit `dependencies.lock`.
