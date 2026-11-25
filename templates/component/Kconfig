@@ -1,0 +1,10 @@
+menu "Bojaqu __COMPONENT_TITLE__ Configuration"
+
+    config __COMPONENT_UPPER___DEFAULT_TIMEOUT_MS
+        int "Default operation timeout (ms)"
+        default 100
+        range 1 60000
+        help
+            Default timeout in milliseconds used by __COMPONENT_NAME__ operations.
+
+endmenu

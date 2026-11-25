@@ -1,0 +1,11 @@
+idf_component_register(
+    SRCS
+        "src/bjq_mfrc522.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        esp_driver_spi
+        esp_driver_gpio
+    PRIV_REQUIRES
+        log
+)

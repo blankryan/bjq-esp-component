@@ -1,0 +1,5 @@
+dependencies:
+  idf:
+    version: ">=6.1.0,<7.0.0"
+  bjq_mfrc522:
+    override_path: "../.."

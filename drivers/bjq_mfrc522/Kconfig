@@ -1,0 +1,18 @@
+menu "Bojaqu MFRC522 Configuration"
+
+    config BJQ_MFRC522_DEFAULT_SPI_CLOCK_HZ
+        int "Default SPI clock frequency (Hz)"
+        default 4000000
+        range 100000 10000000
+        help
+            Default SPI bus clock speed used when runtime spi_clock_hz is 0.
+            The MFRC522 datasheet specifies a maximum SPI clock of 10 MHz.
+
+    config BJQ_MFRC522_DEFAULT_TIMEOUT_MS
+        int "Default transaction timeout (ms)"
+        default 100
+        range 1 5000
+        help
+            Default timeout in milliseconds for MFRC522 operations.
+
+endmenu

@@ -1,0 +1,5 @@
+dependencies:
+  idf:
+    version: ">=6.1.0,<7.0.0"
+  __COMPONENT_NAME__:
+    override_path: "../.."

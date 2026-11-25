@@ -1,0 +1,34 @@
+# ESP-IDF build and generated artifacts
+build/
+build_*/
+managed_components/
+sdkconfig
+sdkconfig.old
+sdkconfig.ci.*
+dependencies.lock
+pytest_embedded_log/
+junit_*.xml
+*.bin
+*.elf
+*.map
+
+# Documentation generated outputs
+site/
+docs/api/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# IDE and OS
+.vscode/*
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
