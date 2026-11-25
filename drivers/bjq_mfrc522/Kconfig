@@ -13,6 +13,15 @@ menu "Bojaqu MFRC522 Configuration"
         default 100
         range 1 5000
         help
-            Default timeout in milliseconds for MFRC522 operations.
+            Default timeout in milliseconds for MFRC522 operations and polling waits.
+
+    config BJQ_MFRC522_DEFAULT_RX_GAIN
+        int "Default receiver antenna gain index (0..7)"
+        default 4
+        range 0 7
+        help
+            Default MFRC522 RFCfgReg RxGain setting applied during reset:
+            0 = 18 dB, 1 = 23 dB, 2 = 18 dB, 3 = 23 dB,
+            4 = 33 dB (datasheet default), 5 = 38 dB, 6 = 43 dB, 7 = 48 dB.
 
 endmenu
