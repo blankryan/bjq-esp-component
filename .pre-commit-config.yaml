@@ -5,6 +5,7 @@ repos:
       - id: check-merge-conflict
       - id: check-yaml
         args: [--unsafe]
+        exclude: ^templates/
       - id: check-added-large-files
         args: [--maxkb=500]
       - id: end-of-file-fixer

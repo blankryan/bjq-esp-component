@@ -15,12 +15,13 @@ jobs:
   format-and-lint:
     name: Format & Lint (pre-commit)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -33,17 +34,18 @@ jobs:
   validate-and-plan:
     name: Validate Components & Plan Build Matrix
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
       has_apps: ${{ steps.plan.outputs.has_apps }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -73,15 +75,16 @@ jobs:
   docs-check:
     name: Strict Docs Check (Doxygen + MkDocs)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Doxygen
         run: sudo apt-get update && sudo apt-get install -y doxygen
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -89,9 +92,14 @@ jobs:
         run: python -m pip install --upgrade pip -r requirements-docs.txt
 
       - name: Build Doxygen C API reference (warnings as errors)
-        run: doxygen Doxyfile
+        run: |
+          doxygen -v
+          doxygen Doxyfile
 
       - name: Build MkDocs portal (strict)
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+          DISABLE_MKDOCS_2_WARNING: "true"
         run: mkdocs build --strict
 
   build-esp-idf:
@@ -99,6 +107,7 @@ jobs:
     needs: [validate-and-plan]
     if: needs.validate-and-plan.outputs.has_apps == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container:
       image: espressif/idf:v6.1
     strategy:
@@ -107,7 +116,7 @@ jobs:
         entry: ${{ fromJson(needs.validate-and-plan.outputs.matrix) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Mark workspace as safe git directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"

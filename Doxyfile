@@ -2,10 +2,13 @@
 
 PROJECT_NAME           = "Bojaqu ESP-IDF Components"
 PROJECT_BRIEF          = "Public C API reference for reusable ESP-IDF v6.1.0 components"
-OUTPUT_DIRECTORY       = docs/api
+OUTPUT_DIRECTORY       = docs
 CREATE_SUBDIRS         = NO
 ALLOW_UNICODE_NAMES    = YES
 OUTPUT_LANGUAGE        = English
+
+# Single-threaded execution avoids Doxygen 1.9.8 ThreadPool SIGABRT/deadlocks on Ubuntu 24.04
+NUM_PROC_THREADS       = 1
 
 OPTIMIZE_OUTPUT_FOR_C  = YES
 TYPEDEF_HIDES_STRUCT   = YES
@@ -19,7 +22,7 @@ WARNINGS               = YES
 WARN_IF_UNDOCUMENTED   = YES
 WARN_IF_DOC_ERROR      = YES
 WARN_NO_PARAMDOC       = YES
-WARN_AS_ERROR          = YES
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
 
 INPUT                  = utilities drivers platform features
 FILE_PATTERNS          = *.h
@@ -31,7 +34,7 @@ INLINE_SOURCES         = NO
 STRIP_CODE_COMMENTS    = NO
 
 GENERATE_HTML          = YES
-HTML_OUTPUT            = .
+HTML_OUTPUT            = api
 GENERATE_TREEVIEW      = YES
 SEARCHENGINE           = YES
 
@@ -42,4 +45,4 @@ GENERATE_XML           = NO
 
 ENABLE_PREPROCESSING   = YES
 MACRO_EXPANSION        = YES
-PREDEFINED             = __cplusplus=0
+PREDEFINED             =

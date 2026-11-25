@@ -18,7 +18,7 @@ static const char *TAG = "bjq_mfrc522_example";
 #define EXAMPLE_PIN_MISO GPIO_NUM_2
 #define EXAMPLE_PIN_MOSI GPIO_NUM_4
 #define EXAMPLE_PIN_SCLK GPIO_NUM_5
-#define EXAMPLE_PIN_CS   GPIO_NUM_6
+#define EXAMPLE_PIN_CS GPIO_NUM_6
 
 void app_main(void)
 {

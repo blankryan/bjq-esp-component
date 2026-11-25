@@ -87,7 +87,7 @@ def main() -> None:
             with mkdocs_gen_files.open(readme_dst, "w") as fd:
                 fd.write(readme_content)
 
-            summary_lines.append(f"    - `{name}`")
+            summary_lines.append(f"    - {name}")
             summary_lines.append(f"        - [Overview]({layer}/{name}/index.md)")
 
             for src_rel, dst_name, title in DOC_PAGES:
