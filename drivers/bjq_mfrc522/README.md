@@ -5,9 +5,10 @@ ESP-IDF v6.1 driver for the NXP MFRC522 13.56 MHz RFID/NFC transceiver.
 ## Overview
 
 - **Layer:** `drivers`
-- **Current status:** Reference skeleton (`0.1.0` — lifecycle, SPI device registration, and optional reset GPIO configuration are implemented; RF register transactions and ISO14443A card detection are planned).
-- **Scope:** Reusable SPI-based driver for MFRC522 readers using ESP-IDF v6.1 modular drivers (`esp_driver_spi`, `esp_driver_gpio`).
-- **Non-goals:** Product-specific access-control policies, card UID databases, or SPI bus pin allocation (the consuming product initializes and owns the SPI host bus).
+- **Current behavior:** Full SPI register I/O (single/burst read/write, bit set/clear), hardware/software reset, `VersionReg` probing, antenna TX1/TX2 & receiver gain control, and ISO/IEC 14443-3A card polling (`REQA`/`WUPA`), multi-cascade anticollision and selection (4-, 7-, and 10-byte UIDs with BCC & hardware CRC_A verification), `HLTA`, SAK PICC type decoding, and UID hex formatting.
+- **Design intent:** Optional MIFARE Classic Crypto1 authentication and block read/write APIs in a future release.
+- **Scope:** Reusable SPI-based MFRC522 driver built on ESP-IDF v6.1 modular drivers (`esp_driver_spi`, `esp_driver_gpio`).
+- **Non-goals:** Product-specific access-control databases, card authorization logic, or SPI host bus pin allocation (the consuming product initializes and owns the SPI host bus).
 
 ## Compatibility
 
@@ -19,11 +20,11 @@ ESP-IDF v6.1 driver for the NXP MFRC522 13.56 MHz RFID/NFC transceiver.
 
 ## Dependencies
 
-- **ESP-IDF components:** `esp_driver_spi`, `esp_driver_gpio`, `log` (private).
+- **ESP-IDF components:** `esp_driver_spi`, `esp_driver_gpio` (public); `log`, `esp_timer`, `freertos` (private).
 - **Intra-repo components:** None.
 - **Hardware requirements:**
-  - 3.3 V MFRC522 module connected to an initialized ESP-IDF SPI host bus (MOSI, MISO, SCLK, CS).
-  - Optional reset GPIO (`rst_io_num`, set to `GPIO_NUM_NC` if tied high in hardware).
+  - 3.3 V MFRC522 module connected to an initialized ESP-IDF SPI host bus (MOSI, MISO, SCLK, CS; SPI mode 0, up to 10 MHz).
+  - Optional hardware reset GPIO (`rst_io_num`, set to `GPIO_NUM_NC` if tied to 3.3 V in hardware).
 
 ## Integration
 
@@ -39,10 +40,11 @@ dependencies:
     version: "bjq_mfrc522/v0.1.0"
 ```
 
-Initialize the SPI bus in your product firmware, then attach `bjq_mfrc522`:
+Initialize the SPI bus in your product firmware, attach `bjq_mfrc522`, and poll for ISO14443A cards:
 
 ```c
 #include "driver/spi_master.h"
+#include "esp_log.h"
 #include "bjq_mfrc522.h"
 
 bjq_mfrc522_config_t cfg = {
@@ -55,6 +57,18 @@ bjq_mfrc522_config_t cfg = {
 
 bjq_mfrc522_handle_t reader = NULL;
 ESP_ERROR_CHECK(bjq_mfrc522_init(&cfg, &reader));
+
+bool present = false;
+if (bjq_mfrc522_is_new_card_present(reader, &present) == ESP_OK && present) {
+    bjq_mfrc522_uid_t uid = {0};
+    if (bjq_mfrc522_read_card_uid(reader, &uid) == ESP_OK) {
+        char hex[BJQ_MFRC522_UID_HEX_STR_MIN_LEN];
+        bjq_mfrc522_uid_to_hex(&uid, hex, sizeof(hex));
+        ESP_LOGI("app", "Card UID=%s (%s)", hex,
+                 bjq_mfrc522_picc_type_name(bjq_mfrc522_get_picc_type(uid.sak)));
+        bjq_mfrc522_halt_card(reader);
+    }
+}
 ```
 
 ## Documentation
@@ -67,9 +81,9 @@ ESP_ERROR_CHECK(bjq_mfrc522_init(&cfg, &reader));
 
 ## Testing
 
-- **Examples:** `examples/basic` — initializes an SPI2 bus, attaches `bjq_mfrc522`, logs active configuration, and deinitializes cleanly (compiled in CI on `esp32`, `esp32s3`, `esp32c3`, `esp32c6`).
-- **Test App:** `test_apps/` — Unity test suite covering parameter validation and SPI handle lifecycle (compiled in CI on all 4 targets).
-- **Hardware verification:** Not yet executed on physical MFRC522 hardware (build-verified only).
+- **Examples:** `examples/basic` — initializes an SPI2 bus, attaches `bjq_mfrc522`, logs `VersionReg`, and polls for ISO14443A cards in a FreeRTOS loop (compiled in CI on `esp32`, `esp32s3`, `esp32c3`, `esp32c6`).
+- **Test App:** `test_apps/` — Unity test suite verifying parameter/bounds validation across register and card APIs, SAK PICC-type decoding, and 4/7/10-byte UID hex formatting (compiled in CI on all 4 targets).
+- **Hardware verification:** Pending physical MFRC522 bench validation (currently build-verified across all 4 targets).
 
 ## License
 
