@@ -16,6 +16,9 @@ junit_*.xml
 site/
 docs/api/
 
+# Local raw bench-test serial monitor captures (curated excerpts go in docs/bench-testing.md)
+bench_logs/
+
 # Python
 __pycache__/
 *.py[cod]

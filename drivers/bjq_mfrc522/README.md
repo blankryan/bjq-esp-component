@@ -63,6 +63,7 @@ ESP_ERROR_CHECK(bjq_mfrc522_init(&cfg, &reader));
 - [Configuration](docs/configuration.md)
 - [Concurrency & Resources](docs/concurrency-and-resources.md)
 - [Troubleshooting & Error Handling](docs/troubleshooting.md)
+- [Bench Testing & Hardware Validation](docs/bench-testing.md)
 - [Changelog](CHANGELOG.md)
 
 ## Testing

@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = 'build/__COMPONENT_NAME___test_app.bin'
+elf = 'build/__COMPONENT_NAME___test_app.elf'

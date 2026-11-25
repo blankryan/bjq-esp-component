@@ -66,6 +66,12 @@ def main() -> int:
             return 1
         shutil.rmtree(dest_dir)
 
+    today_str = dt.date.today().isoformat()
+    bench_rows = "\n".join(
+        f"| `{target}` | Build-only (CI) | N/A | `examples/ + test_apps/` | `{args.version}` (`unreleased`) | "
+        f"{today_str} | **BUILD-ONLY** | Initial scaffold — not yet bench-tested |"
+        for target in args.targets
+    )
     replacements = {
         "__COMPONENT_NAME__": args.name,
         "__COMPONENT_UPPER__": args.name.upper(),
@@ -75,7 +81,8 @@ def main() -> int:
         "__VERSION__": args.version,
         "__TARGETS_YAML__": "\n".join(f"  - {target}" for target in args.targets),
         "__TARGETS_MD__": ", ".join(f"`{target}`" for target in args.targets),
-        "__DATE__": dt.date.today().isoformat(),
+        "__TARGETS_BENCH_ROWS__": bench_rows,
+        "__DATE__": today_str,
     }
 
     for src_path in sorted(TEMPLATE_DIR.rglob("*")):
