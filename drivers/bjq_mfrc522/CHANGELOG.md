@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-25
+
 ### Added
 
 - Renamed component to `bjq_mfrc522` under `drivers/bjq_mfrc522` with full `bjq_` namespacing.
 - Added ESP-IDF v6.1.0 modular driver `CMakeLists.txt` (`esp_driver_spi`, `esp_driver_gpio`), `Kconfig`, and `idf_component.yml`.
 - Added Doxygen-documented lifecycle API (`bjq_mfrc522_init`, `bjq_mfrc522_deinit`, `bjq_mfrc522_get_config`) with SPI device handle management and optional reset GPIO setup.
 - Added component documentation (`README.md`, `docs/`), `examples/basic`, and `test_apps/`.
+
+[Unreleased]: https://github.com/blankryan/bjq-esp-component/compare/bjq_mfrc522/v0.1.0...HEAD
+[0.1.0]: https://github.com/blankryan/bjq-esp-component/releases/tag/bjq_mfrc522/v0.1.0
