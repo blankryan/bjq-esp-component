@@ -138,3 +138,33 @@ jobs:
             --build-dir "build_@t_@w" \
             --no-preserve \
             --check-warnings
+
+  ci-gate:
+    name: CI Gate
+    needs: [format-and-lint, validate-and-plan, docs-check, build-esp-idf]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify all required CI jobs passed
+        env:
+          FORMAT_RESULT: ${{ needs.format-and-lint.result }}
+          VALIDATE_RESULT: ${{ needs.validate-and-plan.result }}
+          DOCS_RESULT: ${{ needs.docs-check.result }}
+          BUILD_RESULT: ${{ needs.build-esp-idf.result }}
+        run: |
+          echo "format-and-lint: ${FORMAT_RESULT}"
+          echo "validate-and-plan: ${VALIDATE_RESULT}"
+          echo "docs-check: ${DOCS_RESULT}"
+          echo "build-esp-idf: ${BUILD_RESULT}"
+          if [ "${FORMAT_RESULT}" != "success" ] || \
+             [ "${VALIDATE_RESULT}" != "success" ] || \
+             [ "${DOCS_RESULT}" != "success" ]; then
+            echo "ERROR: One or more core CI checks did not succeed."
+            exit 1
+          fi
+          if [ "${BUILD_RESULT}" != "success" ] && [ "${BUILD_RESULT}" != "skipped" ]; then
+            echo "ERROR: ESP-IDF build matrix did not succeed (${BUILD_RESULT})."
+            exit 1
+          fi
+          echo "All required CI checks passed."
