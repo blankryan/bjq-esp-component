@@ -13,9 +13,12 @@
 
 | Resource | Value | Classification | Notes |
 |---|---|---|---|
+| Component Flash code (`libbjq_mfrc522.a`) | `4,371` bytes (`.text` + `.literal`) | Measured (`esp32s3`, ESP-IDF `6.1.0`, `examples/basic`) | From linker `.map` (`v0.2.0`). |
+| Component Static RAM (`libbjq_mfrc522.a`) | `0` bytes `.data`, `0` bytes `.bss` | Measured (`esp32s3`, ESP-IDF `6.1.0`, `examples/basic`) | All driver state is per-instance heap context; string literals reside in Flash `.rodata`. |
+| Reference app total image (`examples/basic`) | `220,776` bytes (`Flash Code: 97,082 B`, `Flash Data: 49,672 B`, `DIRAM: 60,314 B`) | Measured (`esp32s3`, ESP-IDF `6.1.0`, `idf.py size`) | Includes ESP-IDF runtime, `esp_driver_spi`, `esp_driver_gpio`, and `bjq_mfrc522`. |
+| Reference test app total image (`test_apps`) | `210,436` bytes (`Flash Code: 89,910 B`, `Flash Data: 46,964 B`, `DIRAM: 60,014 B`) | Measured (`esp32s3`, ESP-IDF `6.1.0`, `idf.py size`) | Includes Unity test framework and `bjq_mfrc522`. |
 | Driver context heap per handle | `sizeof(struct bjq_mfrc522_ctx)` (~32 bytes) | Estimated (compile-time struct size) | Allocated once in `bjq_mfrc522_init()`, freed in `bjq_mfrc522_deinit()`. Excludes `spi_device_handle_t` internal allocation inside `esp_driver_spi`. |
 | Dynamic heap during polling / UID read | `0` bytes | Current behavior | All register, FIFO burst, CRC, and anticollision buffers are fixed-size stack arrays. |
-| Peak stack usage in driver calls | ~256–384 bytes (65-byte TX + 65-byte RX burst buffers + local frames) | Estimated | Update with FreeRTOS high-water-mark measurements during hardware bench testing. |
-| Static RAM | Negligible (`TAG` and PICC name string literals in `.rodata`) | Estimated | Update with `.map` measurements after hardware validation. |
+| Peak stack usage in driver calls | ~256–384 bytes (65-byte TX + 65-byte RX burst buffers + local frames) | Estimated | Update with FreeRTOS high-water-mark measurements during physical hardware bench testing. |
 | FreeRTOS tasks / queues | `0` | Current behavior | Synchronous caller-driven API. |
 | Hardware peripherals | 1 SPI device slot + 1 CS GPIO (+ optional 1 RST GPIO) | Current behavior | SPI host bus is shared and owned by the caller. |

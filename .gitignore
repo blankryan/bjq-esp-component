@@ -29,6 +29,8 @@ venv/
 # IDE and OS
 .vscode/*
 !.vscode/settings.json
+.cache/
+compile_commands.json
 .idea/
 .DS_Store
 Thumbs.db

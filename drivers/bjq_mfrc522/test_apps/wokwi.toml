@@ -1,4 +1,4 @@
 [wokwi]
 version = 1
-firmware = 'build/bjq_mfrc522_test_app.bin'
+firmware = 'build/flasher_args.json'
 elf = 'build/bjq_mfrc522_test_app.elf'

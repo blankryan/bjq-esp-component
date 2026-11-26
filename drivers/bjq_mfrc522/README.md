@@ -37,7 +37,7 @@ dependencies:
   bjq_mfrc522:
     git: "https://github.com/blankryan/bjq-esp-component.git"
     path: "drivers/bjq_mfrc522"
-    version: "bjq_mfrc522/v0.1.0"
+    version: "bjq_mfrc522/v0.2.0"
 ```
 
 Initialize the SPI bus in your product firmware, attach `bjq_mfrc522`, and poll for ISO14443A cards:
@@ -84,7 +84,7 @@ if (bjq_mfrc522_is_new_card_present(reader, &present) == ESP_OK && present) {
 
 - **Examples:** `examples/basic` — initializes an SPI2 bus, attaches `bjq_mfrc522`, logs `VersionReg`, and polls for ISO14443A cards in a FreeRTOS loop (compiled in CI on `esp32`, `esp32s3`, `esp32c3`, `esp32c6`).
 - **Test App:** `test_apps/` — Unity test suite verifying parameter/bounds validation across register and card APIs, SAK PICC-type decoding, and 4/7/10-byte UID hex formatting (compiled in CI on all 4 targets).
-- **Hardware verification:** Pending physical MFRC522 bench validation (currently build-verified across all 4 targets).
+- **Bench verification (`0.2.0`):** Wokwi-verified on `esp32s3` (`board-esp32-s3-devkitc-1` + `board-mfrc522`): 5/5 Unity tests PASS, `VersionReg=0x92`, and MIFARE Classic 1K UID reads verified over SPI2 @ 4 MHz. `esp32`, `esp32c3`, and `esp32c6` are CI build-verified (physical boards unavailable on bench). See [docs/bench-testing.md](docs/bench-testing.md).
 
 ## License
 

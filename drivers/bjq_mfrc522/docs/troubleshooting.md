@@ -27,4 +27,4 @@
 
 - **Current scope:** Covers SPI register I/O, transceiver control, and ISO/IEC 14443-3A card detection + UID reading (`REQA`, `WUPA`, Cascade Levels 1–3 anticollision/select, `HLTA`). MIFARE Classic Crypto1 authentication and block read/write commands are not implemented yet.
 - **Bus interface:** SPI mode 0 only; I2C and UART interfaces of the MFRC522 chip are out of scope.
-- **Hardware testing:** Build-verified in CI across `esp32`, `esp32s3`, `esp32c3`, and `esp32c6`; physical MFRC522 bench testing is not automated in CI yet.
+- **Hardware testing:** Wokwi-verified on `esp32s3` (`board-esp32-s3-devkitc-1` + `board-mfrc522`, see [bench-testing.md](bench-testing.md)) and build-verified in CI across `esp32`, `esp32s3`, `esp32c3`, and `esp32c6`; physical MFRC522 RF bench testing is pending.
