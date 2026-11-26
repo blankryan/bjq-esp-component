@@ -1,4 +1,4 @@
-version: "0.1.0"
+version: "0.2.0"
 description: "ESP-IDF v6.1 driver for the NXP MFRC522 13.56 MHz RFID/NFC transceiver"
 license: "Apache-2.0"
 url: "https://github.com/blankryan/bjq-esp-component/tree/main/drivers/bjq_mfrc522"
