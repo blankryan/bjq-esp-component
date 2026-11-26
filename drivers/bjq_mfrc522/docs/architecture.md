@@ -2,8 +2,8 @@
 
 ## Current Behavior vs. Design Intent
 
-- **Current behavior:** Implements full SPI register I/O (single and 64-byte FIFO burst transfers), hardware/software reset, `VersionReg` reading, antenna TX1/TX2 & receiver gain control, MFRC522 hardware CRC_A calculation, and ISO/IEC 14443-3A card detection (`REQA`/`WUPA`), multi-cascade anticollision/select (4-, 7-, and 10-byte UIDs), `HLTA`, SAK PICC type decoding, and UID formatting.
-- **Design intent:** Optional MIFARE Classic Crypto1 authentication and memory block read/write APIs in future minor releases, keeping existing lifecycle and UID APIs backward-compatible.
+- **Current behavior:** Implements full SPI register I/O (single and 64-byte FIFO burst transfers), hardware/software reset, `VersionReg` reading, antenna TX1/TX2 & receiver gain control, MFRC522 hardware CRC_A calculation, ISO/IEC 14443-3A card detection (`REQA`/`WUPA`), multi-cascade anticollision/select (4-, 7-, and 10-byte UIDs), `HLTA`, SAK PICC type decoding, UID formatting, and MIFARE Classic Crypto1 sector authentication (`PCD_MFAuthent`) + 16-byte block read/write (safe data-block write and raw trailer write).
+- **Design intent:** Optional MIFARE Classic value-block operations and Ultralight/NTAG page read/write helpers in future minor releases, keeping existing APIs backward-compatible.
 
 ## Module Overview
 
@@ -42,8 +42,18 @@ sequenceDiagram
     end
     Drv-->>App: bjq_mfrc522_uid_t (bytes, size, sak)
 
-    App->>Drv: bjq_mfrc522_halt_card()
-    Drv->>Chip: Transceive HLTA (0x50, 0x00, CRC_A)
+    App->>Drv: bjq_mfrc522_mifare_authenticate(KEY_A/B, block, key, uid)
+    Drv->>Chip: PCD_MFAuthent (12-byte payload -> verify Status2Reg.MFCrypto1On)
+    Chip->>Card: Crypto1 3-pass authentication
+    Drv-->>App: ESP_OK (or ESP_ERR_NOT_ALLOWED)
+
+    App->>Drv: bjq_mfrc522_mifare_read_block / write_block
+    Drv->>Chip: Transceive 0x30 (Read + CRC_A) or 0xA0 (2-phase Write + 4-bit ACK)
+    Chip->>Card: Encrypted Crypto1 block transfer
+    Drv-->>App: 16-byte block data / ESP_OK
+
+    App->>Drv: bjq_mfrc522_halt_card() + bjq_mfrc522_stop_crypto()
+    Drv->>Chip: Transceive HLTA (0x50, 0x00, CRC_A) & clear MFCrypto1On
     Chip->>Card: RF HLTA (silent acknowledgement -> timeout == ESP_OK)
 ```
 

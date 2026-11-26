@@ -824,6 +824,215 @@ esp_err_t bjq_mfrc522_stop_crypto(bjq_mfrc522_handle_t handle)
     return bjq_mfrc522_clear_reg_bits(handle, BJQ_MFRC522_REG_STATUS2, BJQ_MFRC522_STATUS2_CRYPTO1_ON);
 }
 
+static esp_err_t mfrc522_mifare_transceive_ack(bjq_mfrc522_handle_t handle, const uint8_t *send_data, size_t send_len)
+{
+    if (send_data == NULL || send_len == 0U || send_len > BJQ_MFRC522_MIFARE_BLOCK_SIZE) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint8_t frame[BJQ_MFRC522_MIFARE_BLOCK_SIZE + 2U] = {0};
+    memcpy(frame, send_data, send_len);
+    esp_err_t err = mfrc522_calc_crc(handle, frame, send_len, &frame[send_len]);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    uint8_t rx_buf[4] = {0};
+    size_t rx_len = sizeof(rx_buf);
+    uint8_t valid_bits = 0U;
+    err = mfrc522_transceive(handle, frame, send_len + 2U, rx_buf, &rx_len, &valid_bits, 0U, false);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    if (rx_len != 1U || valid_bits != 4U) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    if ((rx_buf[0] & 0x0FU) != BJQ_MFRC522_MIFARE_ACK) {
+        return ESP_ERR_NOT_ALLOWED;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t bjq_mfrc522_mifare_authenticate(bjq_mfrc522_handle_t handle, bjq_mfrc522_mifare_key_type_t key_type,
+                                          uint8_t block_addr, const bjq_mfrc522_mifare_key_t *key,
+                                          const bjq_mfrc522_uid_t *uid)
+{
+    if (handle == NULL || key == NULL || uid == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (key_type != BJQ_MFRC522_MIFARE_KEY_A && key_type != BJQ_MFRC522_MIFARE_KEY_B) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (uid->size != 4U && uid->size != 7U && uid->size != 10U) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint8_t auth_cmd = (key_type == BJQ_MFRC522_MIFARE_KEY_A) ? BJQ_MFRC522_PICC_CMD_MF_AUTH_KEY_A
+                                                              : BJQ_MFRC522_PICC_CMD_MF_AUTH_KEY_B;
+
+    /* 12-byte MFAuthent payload: [cmd, block_addr, key(6), last 4 bytes of UID]. */
+    uint8_t payload[12] = {0};
+    payload[0] = auth_cmd;
+    payload[1] = block_addr;
+    memcpy(&payload[2], key->bytes, BJQ_MFRC522_MIFARE_KEY_SIZE);
+    memcpy(&payload[8], &uid->bytes[uid->size - 4U], 4U);
+
+    esp_err_t err = bjq_mfrc522_write_reg(handle, BJQ_MFRC522_REG_COMMAND, BJQ_MFRC522_CMD_IDLE);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = bjq_mfrc522_write_reg(handle, BJQ_MFRC522_REG_COM_IRQ, BJQ_MFRC522_COM_IRQ_CLEAR_ALL);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = bjq_mfrc522_write_reg(handle, BJQ_MFRC522_REG_FIFO_LEVEL, BJQ_MFRC522_FIFO_FLUSH_BIT);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = bjq_mfrc522_write_reg_buf(handle, BJQ_MFRC522_REG_FIFO_DATA, payload, sizeof(payload));
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = bjq_mfrc522_write_reg(handle, BJQ_MFRC522_REG_BIT_FRAMING, 0x00U);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = bjq_mfrc522_write_reg(handle, BJQ_MFRC522_REG_COMMAND, BJQ_MFRC522_CMD_MF_AUTHENT);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    int64_t deadline_us = esp_timer_get_time() + ((int64_t)handle->config.timeout_ms * 1000LL);
+    while (true) {
+        uint8_t irq = 0;
+        err = bjq_mfrc522_read_reg(handle, BJQ_MFRC522_REG_COM_IRQ, &irq);
+        if (err != ESP_OK) {
+            return err;
+        }
+        if ((irq & BJQ_MFRC522_COM_IRQ_IDLE) != 0U) {
+            break;
+        }
+        if ((irq & BJQ_MFRC522_COM_IRQ_TIMER) != 0U) {
+            (void)bjq_mfrc522_write_reg(handle, BJQ_MFRC522_REG_COMMAND, BJQ_MFRC522_CMD_IDLE);
+            return ESP_ERR_TIMEOUT;
+        }
+        if (esp_timer_get_time() >= deadline_us) {
+            (void)bjq_mfrc522_write_reg(handle, BJQ_MFRC522_REG_COMMAND, BJQ_MFRC522_CMD_IDLE);
+            return ESP_ERR_TIMEOUT;
+        }
+        vTaskDelay(1);
+    }
+
+    uint8_t err_reg = 0;
+    err = bjq_mfrc522_read_reg(handle, BJQ_MFRC522_REG_ERROR, &err_reg);
+    if (err != ESP_OK) {
+        return err;
+    }
+    if ((err_reg & (BJQ_MFRC522_ERR_BUFFER_OVFL | BJQ_MFRC522_ERR_PARITY | BJQ_MFRC522_ERR_PROTOCOL)) != 0U) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    uint8_t status2 = 0;
+    err = bjq_mfrc522_read_reg(handle, BJQ_MFRC522_REG_STATUS2, &status2);
+    if (err != ESP_OK) {
+        return err;
+    }
+    if ((status2 & BJQ_MFRC522_STATUS2_CRYPTO1_ON) == 0U) {
+        return ESP_ERR_NOT_ALLOWED;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t bjq_mfrc522_mifare_read_block(bjq_mfrc522_handle_t handle, uint8_t block_addr,
+                                        uint8_t out_data[BJQ_MFRC522_MIFARE_BLOCK_SIZE])
+{
+    if (handle == NULL || out_data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint8_t cmd[4] = {BJQ_MFRC522_PICC_CMD_MF_READ, block_addr, 0x00U, 0x00U};
+    esp_err_t err = mfrc522_calc_crc(handle, cmd, 2U, &cmd[2]);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    uint8_t rx_buf[BJQ_MFRC522_MIFARE_BLOCK_SIZE + 2U] = {0};
+    size_t rx_len = sizeof(rx_buf);
+    uint8_t valid_bits = 0U;
+    err = mfrc522_transceive(handle, cmd, sizeof(cmd), rx_buf, &rx_len, &valid_bits, 0U, false);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    if (rx_len == 1U && valid_bits == 4U) {
+        return ESP_ERR_NOT_ALLOWED;
+    }
+    if (rx_len != sizeof(rx_buf) || valid_bits != 0U) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    uint8_t expected_crc[2] = {0};
+    err = mfrc522_calc_crc(handle, rx_buf, BJQ_MFRC522_MIFARE_BLOCK_SIZE, expected_crc);
+    if (err != ESP_OK) {
+        return err;
+    }
+    if (rx_buf[BJQ_MFRC522_MIFARE_BLOCK_SIZE] != expected_crc[0] ||
+        rx_buf[BJQ_MFRC522_MIFARE_BLOCK_SIZE + 1U] != expected_crc[1]) {
+        return ESP_ERR_INVALID_CRC;
+    }
+
+    memcpy(out_data, rx_buf, BJQ_MFRC522_MIFARE_BLOCK_SIZE);
+    return ESP_OK;
+}
+
+esp_err_t bjq_mfrc522_mifare_write_block_raw(bjq_mfrc522_handle_t handle, uint8_t block_addr,
+                                             const uint8_t data[BJQ_MFRC522_MIFARE_BLOCK_SIZE])
+{
+    if (handle == NULL || data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint8_t cmd[2] = {BJQ_MFRC522_PICC_CMD_MF_WRITE, block_addr};
+    esp_err_t err = mfrc522_mifare_transceive_ack(handle, cmd, sizeof(cmd));
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    return mfrc522_mifare_transceive_ack(handle, data, BJQ_MFRC522_MIFARE_BLOCK_SIZE);
+}
+
+esp_err_t bjq_mfrc522_mifare_write_block(bjq_mfrc522_handle_t handle, uint8_t block_addr,
+                                         const uint8_t data[BJQ_MFRC522_MIFARE_BLOCK_SIZE])
+{
+    if (handle == NULL || data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (bjq_mfrc522_mifare_is_manufacturer_block(block_addr) || bjq_mfrc522_mifare_is_sector_trailer(block_addr)) {
+        ESP_LOGE(TAG, "Refusing safe write to protected block %u (use write_block_raw for trailers)",
+                 (unsigned)block_addr);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    return bjq_mfrc522_mifare_write_block_raw(handle, block_addr, data);
+}
+
+bool bjq_mfrc522_mifare_is_sector_trailer(uint8_t block_addr)
+{
+    if (block_addr < 128U) {
+        return (block_addr % 4U) == 3U;
+    }
+    return (block_addr % 16U) == 15U;
+}
+
+bool bjq_mfrc522_mifare_is_manufacturer_block(uint8_t block_addr)
+{
+    return block_addr == 0U;
+}
+
 bjq_mfrc522_picc_type_t bjq_mfrc522_get_picc_type(uint8_t sak)
 {
     uint8_t masked = (uint8_t)(sak & 0x7FU);

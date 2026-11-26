@@ -11,6 +11,7 @@
 | `ESP_ERR_TIMEOUT` | MFRC522 failed to exit soft reset (`PowerDown` bit stayed set), CRC timed out, or card left the RF field mid-transaction | Check 3.3 V power, SPI wiring (MOSI/MISO/SCLK/CS), and RST pin polarity; retry card read |
 | `ESP_ERR_INVALID_CRC` | Anticollision BCC mismatch or SAK hardware CRC_A mismatch | Card moved out of field or RF noise; retry poll or adjust `bjq_mfrc522_set_rx_gain()` |
 | `ESP_ERR_INVALID_RESPONSE` | Parity/protocol/buffer-overflow error in `ErrorReg`, malformed frame length, or unexpected reply to `HLTA` | Retry poll; verify SPI clock speed (`<= 4 MHz` recommended on breadboards) |
+| `ESP_ERR_NOT_ALLOWED` | MIFARE Classic Crypto1 key rejected (`MFCrypto1On` stayed cleared) or card returned a 4-bit NACK on block read/write | Verify sector Key A/B and access bits, re-select card (`REQA`/`WUPA` + `read_card_uid`), and ensure `bjq_mfrc522_stop_crypto()` is called between sessions |
 | `ESP_ERR_NO_MEM` | Heap allocation failed for driver context or SPI device descriptor | Inspect free heap (`esp_get_free_heap_size()`) |
 
 ## Common Hardware Checks
@@ -23,8 +24,13 @@
    - Verify the card is ISO/IEC 14443-3A (13.56 MHz, e.g., MIFARE Classic / Ultralight / NTAG / DESFire — 125 kHz EM4100 cards are not compatible).
    - Try increasing receiver gain with `bjq_mfrc522_set_rx_gain(handle, BJQ_MFRC522_RX_GAIN_48DB)`.
 
+3. **Subsequent card polls fail after a MIFARE Classic read/write session:**
+   - Always call `bjq_mfrc522_stop_crypto(handle)` after finishing an authenticated MIFARE session (usually right after `bjq_mfrc522_halt_card()`). Leaving `Status2Reg.MFCrypto1On` set causes future `REQA`/`WUPA` frames to fail.
+4. **`bjq_mfrc522_mifare_write_block()` returns `ESP_ERR_INVALID_ARG` on blocks 0, 3, 7, 11, ...:**
+   - `bjq_mfrc522_mifare_write_block()` intentionally blocks writes to manufacturer block 0 and all MIFARE 1K/4K sector trailers to prevent corrupting access bits. Only use `bjq_mfrc522_mifare_write_block_raw()` when deliberately updating sector keys/access bits.
+
 ## Known Limitations
 
-- **Current scope:** Covers SPI register I/O, transceiver control, and ISO/IEC 14443-3A card detection + UID reading (`REQA`, `WUPA`, Cascade Levels 1–3 anticollision/select, `HLTA`). MIFARE Classic Crypto1 authentication and block read/write commands are not implemented yet.
+- **Current scope:** Covers SPI register I/O, transceiver control, ISO/IEC 14443-3A card detection + UID reading (`REQA`, `WUPA`, Cascade Levels 1–3 anticollision/select, `HLTA`), and MIFARE Classic Crypto1 authentication + 16-byte block read/write. MIFARE value-block commands (`INCREMENT`/`DECREMENT`/`TRANSFER`) and Ultralight/NTAG page writes are not implemented yet.
 - **Bus interface:** SPI mode 0 only; I2C and UART interfaces of the MFRC522 chip are out of scope.
 - **Hardware testing:** Wokwi-verified on `esp32s3` (`board-esp32-s3-devkitc-1` + `board-mfrc522`, see [bench-testing.md](bench-testing.md)) and build-verified in CI across `esp32`, `esp32s3`, `esp32c3`, and `esp32c6`; physical MFRC522 RF bench testing is pending.

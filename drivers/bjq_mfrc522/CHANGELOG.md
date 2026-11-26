@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- MIFARE Classic Crypto1 sector authentication (`bjq_mfrc522_mifare_authenticate`) supporting Key A (`0x60`), Key B (`0x61`), and 4-/7-/10-byte card UIDs.
+- MIFARE Classic 16-byte block read (`bjq_mfrc522_mifare_read_block` with hardware `CRC_A` verification), safe user data-block write (`bjq_mfrc522_mifare_write_block` guarding block 0 and 1K/4K sector trailers), and explicit raw write (`bjq_mfrc522_mifare_write_block_raw`).
+- Pure MIFARE block safety helpers (`bjq_mfrc522_mifare_is_sector_trailer`, `bjq_mfrc522_mifare_is_manufacturer_block`) and factory-default key initializer (`BJQ_MFRC522_MIFARE_DEFAULT_KEY`).
+- MIFARE Classic block 4 authenticate/read/write/readback demo in `examples/basic` and MIFARE block classification + argument guard Unity tests in `test_apps/`.
+
 ## [0.2.0] - 2026-11-26
 
 ### Added

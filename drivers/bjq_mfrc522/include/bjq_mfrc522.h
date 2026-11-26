@@ -35,6 +35,21 @@ extern "C" {
 #define BJQ_MFRC522_UID_HEX_STR_MIN_LEN 30U
 
 /**
+ * @brief Length in bytes of a MIFARE Classic Crypto1 authentication key (Key A or Key B).
+ */
+#define BJQ_MFRC522_MIFARE_KEY_SIZE 6U
+
+/**
+ * @brief Length in bytes of a single MIFARE Classic memory block.
+ */
+#define BJQ_MFRC522_MIFARE_BLOCK_SIZE 16U
+
+/**
+ * @brief Initializer for the factory-default MIFARE Classic key (FF:FF:FF:FF:FF:FF).
+ */
+#define BJQ_MFRC522_MIFARE_DEFAULT_KEY {0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU}
+
+/**
  * @brief Opaque handle representing an initialized MFRC522 driver instance.
  */
 typedef struct bjq_mfrc522_ctx *bjq_mfrc522_handle_t;
@@ -78,6 +93,21 @@ typedef struct {
     uint8_t size;                           /**< Number of valid bytes in @p bytes (4, 7, or 10). */
     uint8_t sak;                            /**< Select Acknowledge (SAK) byte returned by the card. */
 } bjq_mfrc522_uid_t;
+
+/**
+ * @brief MIFARE Classic key selector used with bjq_mfrc522_mifare_authenticate().
+ */
+typedef enum {
+    BJQ_MFRC522_MIFARE_KEY_A = 0, /**< Authenticate using sector Key A (PICC command 0x60). */
+    BJQ_MFRC522_MIFARE_KEY_B = 1, /**< Authenticate using sector Key B (PICC command 0x61). */
+} bjq_mfrc522_mifare_key_type_t;
+
+/**
+ * @brief 6-byte MIFARE Classic Crypto1 sector authentication key.
+ */
+typedef struct {
+    uint8_t bytes[BJQ_MFRC522_MIFARE_KEY_SIZE]; /**< Raw 6-byte key material. */
+} bjq_mfrc522_mifare_key_t;
 
 /**
  * @brief Configuration parameters for attaching an MFRC522 device to an SPI bus.
@@ -339,6 +369,9 @@ esp_err_t bjq_mfrc522_halt_card(bjq_mfrc522_handle_t handle);
 /**
  * @brief Clear the MIFARE Crypto1 state bit (MFCrypto1On) in Status2Reg.
  *
+ * Call this after completing an authenticated MIFARE Classic session (and calling
+ * bjq_mfrc522_halt_card()) so subsequent REQA/WUPA polls operate unencrypted.
+ *
  * @param[in] handle Active driver handle. Must not be NULL.
  *
  * @return
@@ -347,6 +380,117 @@ esp_err_t bjq_mfrc522_halt_card(bjq_mfrc522_handle_t handle);
  *      - Other error codes from SPI operations
  */
 esp_err_t bjq_mfrc522_stop_crypto(bjq_mfrc522_handle_t handle);
+
+/**
+ * @brief Authenticate a MIFARE Classic sector using the MFRC522 Crypto1 engine (PCD_MFAuthent).
+ *
+ * The card must already be selected via bjq_mfrc522_read_card_uid(). Authentication applies to the
+ * entire sector containing @p block_addr until a different sector is authenticated, the card leaves
+ * the field, or bjq_mfrc522_stop_crypto() is called.
+ *
+ * @param[in] handle     Active driver handle. Must not be NULL.
+ * @param[in] key_type   Key A or Key B selector.
+ * @param[in] block_addr Target block address within the sector to authenticate (0..255).
+ * @param[in] key        Pointer to 6-byte MIFARE key. Must not be NULL.
+ * @param[in] uid        Pointer to the selected card UID (size 4, 7, or 10). Must not be NULL.
+ *
+ * @return
+ *      - ESP_OK if Crypto1 authentication succeeded (MFCrypto1On is set)
+ *      - ESP_ERR_INVALID_ARG if arguments are NULL, @p key_type is invalid, or @p uid->size is invalid
+ *      - ESP_ERR_NOT_ALLOWED if the card rejected the key (MFCrypto1On remained cleared)
+ *      - ESP_ERR_TIMEOUT if the card did not respond within the configured timeout
+ *      - ESP_ERR_INVALID_RESPONSE if the transceiver reported a framing, parity, or overflow error
+ *      - Other error codes from SPI operations
+ */
+esp_err_t bjq_mfrc522_mifare_authenticate(bjq_mfrc522_handle_t handle, bjq_mfrc522_mifare_key_type_t key_type,
+                                          uint8_t block_addr, const bjq_mfrc522_mifare_key_t *key,
+                                          const bjq_mfrc522_uid_t *uid);
+
+/**
+ * @brief Read a 16-byte block from an authenticated MIFARE Classic card (PICC command 0x30).
+ *
+ * Verifies the 2-byte ISO/IEC 14443-3A CRC_A returned by the card using the MFRC522 hardware CRC engine.
+ *
+ * @param[in]  handle     Active driver handle. Must not be NULL.
+ * @param[in]  block_addr Block address to read (0..255). Sector must be authenticated first.
+ * @param[out] out_data   Destination buffer receiving 16 bytes on success. Must not be NULL.
+ *
+ * @return
+ *      - ESP_OK on success
+ *      - ESP_ERR_INVALID_ARG if @p handle or @p out_data is NULL
+ *      - ESP_ERR_NOT_ALLOWED if the card returned a 4-bit NACK (e.g., sector not authenticated)
+ *      - ESP_ERR_INVALID_CRC if the returned 2-byte CRC_A did not match
+ *      - ESP_ERR_TIMEOUT if the card did not respond
+ *      - ESP_ERR_INVALID_RESPONSE if the returned frame length or framing was invalid
+ *      - Other error codes from SPI operations
+ */
+esp_err_t bjq_mfrc522_mifare_read_block(bjq_mfrc522_handle_t handle, uint8_t block_addr,
+                                        uint8_t out_data[BJQ_MFRC522_MIFARE_BLOCK_SIZE]);
+
+/**
+ * @brief Safely write a 16-byte user data block to an authenticated MIFARE Classic card.
+ *
+ * Rejects block 0 (manufacturer block) and sector trailers (checked via
+ * bjq_mfrc522_mifare_is_sector_trailer()) with ESP_ERR_INVALID_ARG to prevent accidentally
+ * corrupting access bits or permanently locking a sector. Use bjq_mfrc522_mifare_write_block_raw()
+ * only when intentionally updating keys or access conditions in a sector trailer.
+ *
+ * @param[in] handle     Active driver handle. Must not be NULL.
+ * @param[in] block_addr Non-trailer user data block address (must not be block 0 or a sector trailer).
+ * @param[in] data       16-byte payload to write. Must not be NULL.
+ *
+ * @return
+ *      - ESP_OK if both command and payload phases received a 4-bit MIFARE ACK (0x0A)
+ *      - ESP_ERR_INVALID_ARG if arguments are NULL or @p block_addr is block 0 or a sector trailer
+ *      - ESP_ERR_NOT_ALLOWED if the card returned a 4-bit NACK
+ *      - ESP_ERR_TIMEOUT if the card did not respond
+ *      - ESP_ERR_INVALID_RESPONSE if the transceiver reported a framing or protocol error
+ *      - Other error codes from SPI operations
+ */
+esp_err_t bjq_mfrc522_mifare_write_block(bjq_mfrc522_handle_t handle, uint8_t block_addr,
+                                         const uint8_t data[BJQ_MFRC522_MIFARE_BLOCK_SIZE]);
+
+/**
+ * @brief Write a 16-byte block to an authenticated MIFARE Classic card without trailer guards.
+ *
+ * @warning Writing malformed access bits to a sector trailer can permanently lock the sector.
+ *          Prefer bjq_mfrc522_mifare_write_block() for normal user data blocks.
+ *
+ * @param[in] handle     Active driver handle. Must not be NULL.
+ * @param[in] block_addr Target block address (0..255). Sector must be authenticated first.
+ * @param[in] data       16-byte payload to write. Must not be NULL.
+ *
+ * @return
+ *      - ESP_OK if both write phases received a 4-bit MIFARE ACK (0x0A)
+ *      - ESP_ERR_INVALID_ARG if @p handle or @p data is NULL
+ *      - ESP_ERR_NOT_ALLOWED if the card returned a 4-bit NACK
+ *      - ESP_ERR_TIMEOUT if the card did not respond
+ *      - ESP_ERR_INVALID_RESPONSE if the transceiver reported a framing or protocol error
+ *      - Other error codes from SPI operations
+ */
+esp_err_t bjq_mfrc522_mifare_write_block_raw(bjq_mfrc522_handle_t handle, uint8_t block_addr,
+                                             const uint8_t data[BJQ_MFRC522_MIFARE_BLOCK_SIZE]);
+
+/**
+ * @brief Check whether a MIFARE Classic 1K/4K block address is a sector trailer.
+ *
+ * Sectors 0..31 (blocks 0..127) have 4 blocks per sector (trailers at block % 4 == 3).
+ * Sectors 32..39 on MIFARE Classic 4K (blocks 128..255) have 16 blocks per sector (trailers at block % 16 == 15).
+ *
+ * @param[in] block_addr Block address (0..255).
+ *
+ * @return True if @p block_addr is a sector trailer, false otherwise.
+ */
+bool bjq_mfrc522_mifare_is_sector_trailer(uint8_t block_addr);
+
+/**
+ * @brief Check whether a MIFARE Classic block address is the read-only manufacturer block (block 0).
+ *
+ * @param[in] block_addr Block address (0..255).
+ *
+ * @return True if @p block_addr is 0, false otherwise.
+ */
+bool bjq_mfrc522_mifare_is_manufacturer_block(uint8_t block_addr);
 
 /**
  * @brief Decode a card's Select Acknowledge (SAK) byte into a PICC type enum.

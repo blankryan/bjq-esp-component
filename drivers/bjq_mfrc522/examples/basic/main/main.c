@@ -6,6 +6,7 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
@@ -22,6 +23,54 @@ static const char *TAG = "bjq_mfrc522_example";
 #define EXAMPLE_PIN_MOSI GPIO_NUM_4
 #define EXAMPLE_PIN_SCLK GPIO_NUM_5
 #define EXAMPLE_PIN_CS GPIO_NUM_6
+
+/* Sector 1, first safe user data block (never block 0 or a sector trailer). */
+#define EXAMPLE_MIFARE_DATA_BLOCK 4U
+
+static void demo_mifare_classic_rw(bjq_mfrc522_handle_t reader, const bjq_mfrc522_uid_t *uid)
+{
+    const bjq_mfrc522_mifare_key_t default_key = {
+        .bytes = BJQ_MFRC522_MIFARE_DEFAULT_KEY,
+    };
+
+    esp_err_t err =
+        bjq_mfrc522_mifare_authenticate(reader, BJQ_MFRC522_MIFARE_KEY_A, EXAMPLE_MIFARE_DATA_BLOCK, &default_key, uid);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "MIFARE Key A auth failed on block %u: %s", (unsigned)EXAMPLE_MIFARE_DATA_BLOCK,
+                 esp_err_to_name(err));
+        return;
+    }
+
+    uint8_t original[BJQ_MFRC522_MIFARE_BLOCK_SIZE] = {0};
+    err = bjq_mfrc522_mifare_read_block(reader, EXAMPLE_MIFARE_DATA_BLOCK, original);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "MIFARE read failed on block %u: %s", (unsigned)EXAMPLE_MIFARE_DATA_BLOCK, esp_err_to_name(err));
+        return;
+    }
+    ESP_LOG_BUFFER_HEX_LEVEL(TAG, original, sizeof(original), ESP_LOG_INFO);
+
+    uint8_t payload[BJQ_MFRC522_MIFARE_BLOCK_SIZE] = "BJQ_MFRC522_V03";
+    err = bjq_mfrc522_mifare_write_block(reader, EXAMPLE_MIFARE_DATA_BLOCK, payload);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "MIFARE write failed on block %u: %s", (unsigned)EXAMPLE_MIFARE_DATA_BLOCK, esp_err_to_name(err));
+        return;
+    }
+
+    uint8_t readback[BJQ_MFRC522_MIFARE_BLOCK_SIZE] = {0};
+    err = bjq_mfrc522_mifare_read_block(reader, EXAMPLE_MIFARE_DATA_BLOCK, readback);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "MIFARE readback failed on block %u: %s", (unsigned)EXAMPLE_MIFARE_DATA_BLOCK,
+                 esp_err_to_name(err));
+        return;
+    }
+
+    if (memcmp(payload, readback, sizeof(payload)) == 0) {
+        ESP_LOGI(TAG, "MIFARE block %u write/readback verified: \"%.15s\"", (unsigned)EXAMPLE_MIFARE_DATA_BLOCK,
+                 (const char *)readback);
+    } else {
+        ESP_LOGW(TAG, "MIFARE block %u readback mismatch", (unsigned)EXAMPLE_MIFARE_DATA_BLOCK);
+    }
+}
 
 void app_main(void)
 {
@@ -69,7 +118,14 @@ void app_main(void)
                 bjq_mfrc522_picc_type_t picc_type = bjq_mfrc522_get_picc_type(uid.sak);
                 ESP_LOGI(TAG, "Card detected: UID=%s (%u bytes) SAK=0x%02X Type=%s", uid_hex, (unsigned)uid.size,
                          uid.sak, bjq_mfrc522_picc_type_name(picc_type));
+
+                if (picc_type == BJQ_MFRC522_PICC_MIFARE_1K || picc_type == BJQ_MFRC522_PICC_MIFARE_4K ||
+                    picc_type == BJQ_MFRC522_PICC_MIFARE_MINI) {
+                    demo_mifare_classic_rw(reader, &uid);
+                }
+
                 (void)bjq_mfrc522_halt_card(reader);
+                (void)bjq_mfrc522_stop_crypto(reader);
             } else {
                 ESP_LOGW(TAG, "Failed to read card UID: %s", esp_err_to_name(err));
             }

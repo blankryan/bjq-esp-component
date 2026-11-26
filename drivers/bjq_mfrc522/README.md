@@ -5,8 +5,8 @@ ESP-IDF v6.1 driver for the NXP MFRC522 13.56 MHz RFID/NFC transceiver.
 ## Overview
 
 - **Layer:** `drivers`
-- **Current behavior:** Full SPI register I/O (single/burst read/write, bit set/clear), hardware/software reset, `VersionReg` probing, antenna TX1/TX2 & receiver gain control, and ISO/IEC 14443-3A card polling (`REQA`/`WUPA`), multi-cascade anticollision and selection (4-, 7-, and 10-byte UIDs with BCC & hardware CRC_A verification), `HLTA`, SAK PICC type decoding, and UID hex formatting.
-- **Design intent:** Optional MIFARE Classic Crypto1 authentication and block read/write APIs in a future release.
+- **Current behavior:** Full SPI register I/O (single/burst read/write, bit set/clear), hardware/software reset, `VersionReg` probing, antenna TX1/TX2 & receiver gain control, ISO/IEC 14443-3A card polling (`REQA`/`WUPA`), multi-cascade anticollision and selection (4-, 7-, and 10-byte UIDs with BCC & hardware CRC_A verification), `HLTA`, SAK PICC type decoding, UID hex formatting, and MIFARE Classic Crypto1 sector authentication + 16-byte block read/write (with safe sector-trailer protection).
+- **Design intent:** Optional MIFARE Classic value-block operations (`INCREMENT`/`DECREMENT`/`TRANSFER`) and Ultralight/NTAG page helpers in future minor releases.
 - **Scope:** Reusable SPI-based MFRC522 driver built on ESP-IDF v6.1 modular drivers (`esp_driver_spi`, `esp_driver_gpio`).
 - **Non-goals:** Product-specific access-control databases, card authorization logic, or SPI host bus pin allocation (the consuming product initializes and owns the SPI host bus).
 
@@ -67,6 +67,7 @@ if (bjq_mfrc522_is_new_card_present(reader, &present) == ESP_OK && present) {
         ESP_LOGI("app", "Card UID=%s (%s)", hex,
                  bjq_mfrc522_picc_type_name(bjq_mfrc522_get_picc_type(uid.sak)));
         bjq_mfrc522_halt_card(reader);
+        bjq_mfrc522_stop_crypto(reader);
     }
 }
 ```
